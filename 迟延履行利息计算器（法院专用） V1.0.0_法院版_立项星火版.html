@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>迟延履行利息计算器（法院专用） V1.0.0_法院版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
+        }
+        .court-badge {
+            background: linear-gradient(135deg, #1e40af 0%, #312e81 100%);
+            color: white;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+        }
+        .formula-card {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-left: 4px solid #0ea5e9;
+        }
+        .calculation-step {
+            border-left: 3px solid #3b82f6;
+            padding-left: 1rem;
+            margin: 0.5rem 0;
+        }
+        .highlight-red { color: #dc2626; font-weight: bold; }
+        .highlight-blue { color: #2563eb; font-weight: bold; }
+        .result-box {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .shimmer {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 3s infinite;
+        }
+        @keyframes shimmer {
+            0% { left: -100%; }
+            50% { left: 100%; }
+            100% { left: 100%; }
+        }
+        .legal-ref {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            font-size: 0.875rem;
+            color: #92400e;
+        }
+        .date-input {
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body class="min-h-screen text-slate-800 pb-20">
+
+    <!-- 顶部导航 -->
+    <nav class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-4">
+                    <div class="court-badge px-3 py-1 rounded text-sm">法院专用</div>
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight">迟延履行利息计算器</h1>
+                        <span class="text-xs text-slate-400">依据《民事诉讼法》第260条及最高人民法院司法解释</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span class="bg-white/20 px-2 py-1 rounded text-xs font-mono">V1.0.0_法院版</span>
+                    <button onclick="resetCalculator()" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition">重置</button>
+                    <button onclick="exportReport()" class="px-4 py-2 bg-white text-slate-900 hover:bg-slate-100 rounded-lg text-sm font-bold transition">导出计算书</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 宣传栏 -->
+    <div class="bg-gradient-to-r from-slate-800 via-blue-900 to-slate-800 text-white py-3 px-4 shadow-md">
+        <div class="max-w-7xl mx-auto flex items-center justify-center text-sm font-medium">
+            <span class="inline-block animate-pulse mr-3 text-yellow-300">⚖️</span>
+            <span>胡皓 丰衣足食 努力自研 只为打造适合法院执行局使用的专业计算工具！</span>
+            <span class="inline-block animate-pulse ml-3 text-yellow-300">⚖️</span>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- 左侧：输入参数 -->
+            <div class="lg:col-span-4 space-y-5">
+                
+                <!-- 基本信息 -->
+                <div class="glass-panel rounded-2xl p-6">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        执行依据信息
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">执行案号</label>
+                            <input type="text" id="caseNumber" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" placeholder="如：(2026)京0101执1234号">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">债务本金（元）</label>
+                            <input type="number" id="principal" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" placeholder="请输入本金金额" min="0" step="0.01">
+                            <div id="principalChinese" class="mt-1 text-xs text-blue-700 font-medium"></div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">法律文书生效日期</label>
+                            <input type="date" id="effectiveDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm date-input">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">履行期间届满日（起算日）</label>
+                            <input type="date" id="dueDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm date-input">
+                            <p class="text-xs text-slate-500 mt-1">自该日起计算迟延履行利息</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">计算截止日期</label>
+                            <input type="date" id="endDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm date-input">
+                            <div class="flex items-center mt-2">
+                                <input type="checkbox" id="todayCheck" class="mr-2" onchange="setToday()">
+                                <label class="text-xs text-slate-600">计算至今日</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 利率设置 -->
+                <div class="glass-panel rounded-2xl p-6">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        利率设置
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">一般债务利率（年利率 %）</label>
+                            <div class="flex space-x-2">
+                                <input type="number" id="normalRate" class="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm" placeholder="如：4.35" step="0.01">
+                                <select id="ratePreset" class="px-3 py-2 rounded-xl border border-slate-200 text-sm" onchange="setPresetRate()">
+                                    <option value="">快速选择</option>
+                                    <option value="3.45">LPR 1年期 3.45%</option>
+                                    <option value="4.20">LPR 5年期 4.20%</option>
+                                    <option value="4.35">同期贷款 4.35%</option>
+                                    <option value="6.00">6%</option>
+                                    <option value="0">无息</option>
+                                </select>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1">按判决确定的年利率或LPR计算</p>
+                        </div>
+
+                        <div class="formula-card p-4 rounded-xl">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-bold text-slate-700">加倍部分利率</span>
+                                <span class="text-lg font-bold text-blue-700">日万分之1.75</span>
+                            </div>
+                            <p class="text-xs text-slate-600">即年利率 6.3875%（固定，自2014年8月1日起施行）</p>
+                        </div>
+
+                        <div class="flex items-center space-x-2 pt-2 border-t border-slate-100">
+                            <input type="checkbox" id="before2014" class="w-4 h-4 text-blue-600 rounded">
+                            <label class="text-sm text-slate-700">起算日在2014年8月1日前（适用旧规）</label>
+                        </div>
+                    </div>
+
+                    <button onclick="calculateInterest()" class="w-full mt-6 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-xl transition shadow-lg flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                        </svg>
+                        <span>计算迟延履行利息</span>
+                    </button>
+                </div>
+
+                <!-- 法律依据 -->
+                <div class="legal-ref rounded-xl">
+                    <h3 class="font-bold mb-2">计算依据</h3>
+                    <p class="mb-1">• 《民事诉讼法》第260条</p>
+                    <p class="mb-1">• 《最高人民法院关于执行程序中计算迟延履行期间的债务利息适用法律若干问题的解释》（法释〔2014〕8号）</p>
+                    <p>• 加倍部分日利率：0.0175%（万分之1.75）</p>
+                </div>
+            </div>
+
+            <!-- 右侧：计算结果 -->
+            <div class="lg:col-span-8 space-y-6">
+                
+                <!-- 概览卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="result-box rounded-2xl p-6 shadow-lg relative">
+                        <div class="relative z-10">
+                            <div class="text-sm opacity-90 mb-1">迟延履行天数</div>
+                            <div class="text-3xl font-bold" id="totalDays">--</div>
+                            <div class="text-xs mt-2 opacity-75">自履行期满次日起算</div>
+                        </div>
+                        <div class="shimmer"></div>
+                    </div>
+                    
+                    <div class="glass-panel rounded-2xl p-6 border border-slate-100 md:col-span-2">
+                        <div class="text-sm text-slate-500 mb-1">应付总金额</div>
+                        <div class="flex items-baseline space-x-2">
+                            <span class="text-3xl font-bold text-slate-800" id="totalAmount">--</span>
+                            <span class="text-sm text-slate-500">元</span>
+                        </div>
+                        <div class="text-sm text-blue-700 font-medium mt-1 amount-chinese" id="totalAmountChinese"></div>
+                    </div>
+                </div>
+
+                <!-- 详细计算结果 -->
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            计算明细
+                        </h2>
+                        <div class="text-xs text-slate-500" id="calcDateRange"></div>
+                    </div>
+
+                    <div id="emptyState" class="text-center py-20 text-slate-400">
+                        <svg class="w-20 h-20 mx-auto mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                        </svg>
+                        <p class="text-lg font-medium mb-2">等待计算</p>
+                        <p class="text-sm">请在左侧输入案件信息并点击计算</p>
+                    </div>
+
+                    <div id="calculationResult" class="hidden space-y-6">
+                        <!-- 计算公式展示 -->
+                        <div class="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                            <h3 class="font-bold text-blue-900 mb-3 text-sm">法院统一计算公式</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded text-xs">公式一</span>
+                                    <span class="text-slate-700">一般债务利息 = 本金 × 年利率 × 迟延天数 ÷ 365</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs">公式二</span>
+                                    <span class="text-slate-700">加倍部分利息 = 本金 × 0.0175% × 迟延天数</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-purple-200 text-purple-800 px-2 py-0.5 rounded text-xs">合计</span>
+                                    <span class="text-slate-700 font-bold">总利息 = 一般债务利息 + 加倍部分利息</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 计算过程 -->
+                        <div class="space-y-4">
+                            <!-- 一般债务利息 -->
+                            <div class="bg-white rounded-xl border border-slate-200 p-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h4 class="font-bold text-slate-800 flex items-center">
+                                        <span class="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs mr-2">1</span>
+                                        一般债务利息
+                                    </h4>
+                                    <span class="text-lg font-bold text-blue-700" id="normalInterest">--</span>
+                                </div>
+                                <div class="calculation-step text-sm text-slate-600 font-mono bg-slate-50 p-3 rounded-lg" id="normalCalcProcess">
+                                    <!-- 动态填充 -->
+                                </div>
+                            </div>
+
+                            <!-- 加倍部分利息 -->
+                            <div class="bg-white rounded-xl border border-slate-200 p-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h4 class="font-bold text-slate-800 flex items-center">
+                                        <span class="w-6 h-6 bg-red-100 text-red-700 rounded-full flex items-center justify-center text-xs mr-2">2</span>
+                                        加倍部分债务利息
+                                    </h4>
+                                    <span class="text-lg font-bold text-red-700" id="doubleInterest">--</span>
+                                </div>
+                                <div class="calculation-step text-sm text-slate-600 font-mono bg-slate-50 p-3 rounded-lg" id="doubleCalcProcess">
+                                    <!-- 动态填充 -->
+                                </div>
+                                <div class="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">
+                                    依据《民事诉讼法》第260条：被执行人未按判决指定的期间履行给付金钱义务的，应当加倍支付迟延履行期间的债务利息。
+                                </div>
+                            </div>
+
+                            <!-- 汇总 -->
+                            <div class="bg-slate-800 text-white rounded-xl p-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h4 class="font-bold text-lg">执行标的总额</h4>
+                                    <div class="text-right">
+                                        <div class="text-2xl font-bold" id="grandTotal">--</div>
+                                        <div class="text-xs opacity-80" id="grandTotalChinese"></div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-4 text-sm border-t border-slate-600 pt-4">
+                                    <div>
+                                        <div class="text-slate-400 text-xs">本金</div>
+                                        <div class="font-medium" id="displayPrincipal">--</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-slate-400 text-xs">一般利息</div>
+                                        <div class="font-medium text-blue-300" id="displayNormal">--</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-slate-400 text-xs">加倍利息</div>
+                                        <div class="font-medium text-red-300" id="displayDouble">--</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 分段计算详情（如果跨越大时间段） -->
+                        <div id="segmentDetail" class="hidden">
+                            <h3 class="font-bold text-slate-800 mb-3">分段计算详情</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
+                                    <thead class="bg-slate-50 text-slate-600">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left">期间</th>
+                                            <th class="px-4 py-3 text-right">天数</th>
+                                            <th class="px-4 py-3 text-right">一般利息</th>
+                                            <th class="px-4 py-3 text-right">加倍利息</th>
+                                            <th class="px-4 py-3 text-right">小计</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="segmentTableBody" class="divide-y divide-slate-100 bg-white">
+                                        <!-- 动态填充 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 计算历史 -->
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-slate-700">本次会话计算历史</h3>
+                        <button onclick="clearHistory()" class="text-xs text-red-600 hover:text-red-800">清空</button>
+                    </div>
+                    <div id="historyList" class="space-y-2">
+                        <div class="text-center py-4 text-slate-400 text-sm bg-slate-50 rounded-xl">暂无计算记录</div>
+                    </div>
+                </div>
+
+                <!-- 版本信息 -->
+                <div class="glass-panel rounded-2xl p-6 text-center space-y-3">
+                    <div class="flex items-center justify-center space-x-4 text-sm text-slate-600">
+                        <span class="font-mono bg-slate-100 px-3 py-1 rounded">版本：V1.0.0_法院版</span>
+                        <span>|</span>
+                        <span>作者：<span class="font-bold text-slate-800">胡皓</span></span>
+                        <span>|</span>
+                        <span>更新：2026-04-01</span>
+                    </div>
+                    <p class="text-xs text-slate-400">本计算器计算结果仅供参考，最终以法院执行局核算为准</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 计算历史
+        let calculationHistory = [];
+        let currentCalculation = null;
+
+        // 金额大写转换
+        function digitUppercase(n) {
+            var fraction = ['角', '分'];
+            var digit = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
+            var unit = [['元', '万', '亿'], ['', '拾', '佰', '仟']];
+            var head = n < 0 ? '欠' : '';
+            n = Math.abs(n);
+            var s = '';
+            for (var i = 0; i < fraction.length; i++) {
+                s += (digit[Math.floor(n * 10 * Math.pow(10, i)) % 10] + fraction[i]).replace(/零./, '');
+            }
+            s = s || '整';
+            n = Math.floor(n);
+            for (var i = 0; i < unit[0].length && n > 0; i++) {
+                var p = '';
+                for (var j = 0; j < unit[1].length && n > 0; j++) {
+                    p = digit[n % 10] + unit[1][j] + p;
+                    n = Math.floor(n / 10);
+                }
+                s = p.replace(/(零.)*零$/, '').replace(/^$/, '零') + unit[0][i] + s;
+            }
+            return head + s.replace(/(零.)*零元/, '元').replace(/(零.)+/g, '零').replace(/^整$/, '零元整');
+        }
+
+        function formatAmountYuan(amount) {
+            return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(amount);
+        }
+
+        // 设置今日为截止日期
+        function setToday() {
+            const check = document.getElementById('todayCheck').checked;
+            if (check) {
+                document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
+            }
+        }
+
+        // 设置预设利率
+        function setPresetRate() {
+            const preset = document.getElementById('ratePreset').value;
+            if (preset) {
+                document.getElementById('normalRate').value = preset;
+            }
+        }
+
+        // 本金输入实时显示大写
+        document.getElementById('principal').addEventListener('input', function() {
+            const val = parseFloat(this.value) || 0;
+            if (val > 0) {
+                document.getElementById('principalChinese').textContent = digitUppercase(val);
+            } else {
+                document.getElementById('principalChinese').textContent = '';
+            }
+        });
+
+        // 核心计算函数
+        function calculateInterest() {
+            const principal = parseFloat(document.getElementById('principal').value) || 0;
+            const dueDate = document.getElementById('dueDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const normalRate = parseFloat(document.getElementById('normalRate').value) || 0;
+            const isBefore2014 = document.getElementById('before2014').checked;
+            
+            if (principal <= 0) {
+                alert('请输入有效的债务本金');
+                return;
+            }
+            if (!dueDate || !endDate) {
+                alert('请选择起止日期');
+                return;
+            }
+
+            const start = new Date(dueDate);
+            const end = new Date(endDate);
+            
+            // 起算日应为履行期间届满之次日
+            start.setDate(start.getDate() + 1);
+            
+            if (start > end) {
+                alert('截止日期应晚于履行期间届满日');
+                return;
+            }
+
+            // 计算天数（算头算尾）
+            const diffTime = Math.abs(end - start);
+            const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+            let result = {
+                principal: principal,
+                days: days,
+                startDate: start,
+                endDate: end,
+                normalRate: normalRate,
+                isBefore2014: isBefore2014,
+                caseNumber: document.getElementById('caseNumber').value || '未填写'
+            };
+
+            // 区分2014年8月1日前后
+            const cutoffDate = new Date('2014-08-01');
+            
+            if (isBefore2014 || start < cutoffDate) {
+                // 适用旧规：按同期贷款基准利率双倍计算
+                calculateOldRule(result, start, end, days);
+            } else {
+                // 适用新规：一般债务利息 + 加倍部分（日万分之1.75）
+                calculateNewRule(result, days);
+            }
+
+            currentCalculation = result;
+            displayResult(result);
+            addToHistory(result);
+        }
+
+        function calculateNewRule(result, days) {
+            // 一般债务利息（年利率）
+            const normalInterest = result.principal * (result.normalRate / 100) * days / 365;
+            
+            // 加倍部分利息（日万分之1.75 = 年6.3875%）
+            const dailyRate = 0.000175; // 0.0175%
+            const doubleInterest = result.principal * dailyRate * days;
+            
+            result.normalInterest = normalInterest;
+            result.doubleInterest = doubleInterest;
+            result.totalInterest = normalInterest + doubleInterest;
+            result.grandTotal = result.principal + result.totalInterest;
+            result.rule = 'new';
+            result.dailyRate = dailyRate;
+            
+            // 分段计算（按年或按利率调整点，简化处理）
+            result.segments = [{
+                start: result.startDate,
+                end: result.endDate,
+                days: days,
+                normalInterest: normalInterest,
+                doubleInterest: doubleInterest,
+                total: normalInterest + doubleInterest
+            }];
+        }
+
+        function calculateOldRule(result, start, end, totalDays) {
+            // 旧规：按同期贷款基准利率的双倍计算
+            // 简化处理，假设利率不变
+            const doubleRate = (result.normalRate || 6.00) * 2; // 双倍
+            const totalInterest = result.principal * (doubleRate / 100) * totalDays / 365;
+            
+            result.normalInterest = 0; // 旧规不区分一般利息和加倍利息
+            result.doubleInterest = totalInterest; // 全部视为加倍利息
+            result.totalInterest = totalInterest;
+            result.grandTotal = result.principal + totalInterest;
+            result.rule = 'old';
+            result.doubleRate = doubleRate;
+            
+            result.segments = [{
+                start: start,
+                end: end,
+                days: totalDays,
+                normalInterest: 0,
+                doubleInterest: totalInterest,
+                total: totalInterest
+            }];
+        }
+
+        function displayResult(result) {
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('calculationResult').classList.remove('hidden');
+            
+            // 概览
+            document.getElementById('totalDays').textContent = result.days + ' 天';
+            document.getElementById('totalAmount').textContent = formatAmountYuan(result.grandTotal);
+            document.getElementById('totalAmountChinese').textContent = digitUppercase(result.grandTotal);
+            document.getElementById('calcDateRange').textContent = 
+                `${result.startDate.toLocaleDateString('zh-CN')} 至 ${result.endDate.toLocaleDateString('zh-CN')}（共${result.days}天）`;
+            
+            if (result.rule === 'new') {
+                // 新规显示
+                document.getElementById('normalInterest').textContent = formatAmountYuan(result.normalInterest);
+                document.getElementById('doubleInterest').textContent = formatAmountYuan(result.doubleInterest);
+                
+                // 计算过程
+                const normalProcess = `${formatAmountYuan(result.principal)} × ${result.normalRate}% × ${result.days} ÷ 365 = ${formatAmountYuan(result.normalInterest)}`;
+                document.getElementById('normalCalcProcess').textContent = normalProcess;
+                
+                const doubleProcess = `${formatAmountYuan(result.principal)} × 0.0175% × ${result.days} = ${formatAmountYuan(result.doubleInterest)}`;
+                document.getElementById('doubleCalcProcess').textContent = doubleProcess;
+                
+                // 汇总
+                document.getElementById('grandTotal').textContent = formatAmountYuan(result.grandTotal);
+                document.getElementById('grandTotalChinese').textContent = digitUppercase(result.grandTotal);
+                document.getElementById('displayPrincipal').textContent = formatAmountYuan(result.principal);
+                document.getElementById('displayNormal').textContent = formatAmountYuan(result.normalInterest);
+                document.getElementById('displayDouble').textContent = formatAmountYuan(result.doubleInterest);
+            } else {
+                // 旧规显示
+                document.getElementById('normalInterest').textContent = '¥0.00';
+                document.getElementById('doubleInterest').textContent = formatAmountYuan(result.doubleInterest);
+                
+                document.getElementById('normalCalcProcess').textContent = '适用2014年8月1日前规定，不单独计算一般债务利息';
+                
+                const doubleProcess = `${formatAmountYuan(result.principal)} × ${result.doubleRate}% × ${result.days} ÷ 365 = ${formatAmountYuan(result.doubleInterest)}（双倍利率）`;
+                document.getElementById('doubleCalcProcess').textContent = doubleProcess;
+                
+                document.getElementById('grandTotal').textContent = formatAmountYuan(result.grandTotal);
+                document.getElementById('grandTotalChinese').textContent = digitUppercase(result.grandTotal);
+                document.getElementById('displayPrincipal').textContent = formatAmountYuan(result.principal);
+                document.getElementById('displayNormal').textContent = '¥0.00';
+                document.getElementById('displayDouble').textContent = formatAmountYuan(result.doubleInterest);
+            }
+        }
+
+        function addToHistory(result) {
+            const time = new Date().toLocaleTimeString();
+            calculationHistory.unshift({
+                time: time,
+                case: result.caseNumber,
+                days: result.days,
+                amount: formatAmountYuan(result.grandTotal)
+            });
+            
+            if (calculationHistory.length > 5) calculationHistory.pop();
+            updateHistoryDisplay();
+        }
+
+        function updateHistoryDisplay() {
+            const container = document.getElementById('historyList');
+            if (calculationHistory.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-slate-400 text-sm bg-slate-50 rounded-xl">暂无计算记录</div>';
+                return;
+            }
+            
+            let html = '';
+            calculationHistory.forEach((item, idx) => {
+                html += `
+                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm ${idx === 0 ? 'ring-2 ring-blue-100' : ''}">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-slate-500">${item.time}</span>
+                            <span class="font-medium text-slate-700 truncate max-w-[150px]">${item.case}</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs text-slate-500">${item.days}天</span>
+                            <span class="font-bold text-blue-600">${item.amount}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function clearHistory() {
+            calculationHistory = [];
+            updateHistoryDisplay();
+        }
+
+        function resetCalculator() {
+            document.getElementById('principal').value = '';
+            document.getElementById('principalChinese').textContent = '';
+            document.getElementById('caseNumber').value = '';
+            document.getElementById('effectiveDate').value = '';
+            document.getElementById('dueDate').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('normalRate').value = '';
+            document.getElementById('todayCheck').checked = false;
+            document.getElementById('before2014').checked = false;
+            
+            document.getElementById('emptyState').classList.remove('hidden');
+            document.getElementById('calculationResult').classList.add('hidden');
+            document.getElementById('totalDays').textContent = '--';
+            document.getElementById('totalAmount').textContent = '--';
+            document.getElementById('totalAmountChinese').textContent = '';
+        }
+
+        function exportReport() {
+            if (!currentCalculation) {
+                alert('请先进行计算');
+                return;
+            }
+            
+            const r = currentCalculation;
+            let content = `迟延履行利息计算书\n`;
+            content += `================================\n`;
+            content += `生成时间：${new Date().toLocaleString()}\n`;
+            content += `计算器版本：V1.0.0_法院版\n`;
+            content += `作者：胡皓\n\n`;
+            content += `【案件信息】\n`;
+            content += `执行案号：${r.caseNumber}\n`;
+            content += `债务本金：${formatAmountYuan(r.principal)}（${digitUppercase(r.principal)}）\n`;
+            content += `履行期间届满日：${r.startDate.toLocaleDateString('zh-CN')}\n`;
+            content += `计算截止日期：${r.endDate.toLocaleDateString('zh-CN')}\n`;
+            content += `迟延履行天数：${r.days}天\n\n`;
+            
+            if (r.rule === 'new') {
+                content += `【计算依据】适用《民事诉讼法》第260条及法释〔2014〕8号（2014年8月1日后）\n\n`;
+                content += `【计算过程】\n`;
+                content += `1. 一般债务利息：\n`;
+                content += `   ${formatAmountYuan(r.principal)} × ${r.normalRate}% × ${r.days} ÷ 365\n`;
+                content += `   = ${formatAmountYuan(r.normalInterest)}\n\n`;
+                content += `2. 加倍部分债务利息（日万分之1.75）：\n`;
+                content += `   ${formatAmountYuan(r.principal)} × 0.0175% × ${r.days}\n`;
+                content += `   = ${formatAmountYuan(r.doubleInterest)}\n\n`;
+            } else {
+                content += `【计算依据】适用2014年8月1日前规定（双倍利率）\n\n`;
+                content += `【计算过程】\n`;
+                content += `加倍部分债务利息：\n`;
+                content += `${formatAmountYuan(r.principal)} × ${r.doubleRate}% × ${r.days} ÷ 365\n`;
+                content += `= ${formatAmountYuan(r.doubleInterest)}\n\n`;
+            }
+            
+            content += `【计算结果】\n`;
+            content += `一般债务利息：${formatAmountYuan(r.normalInterest)}\n`;
+            content += `加倍部分利息：${formatAmountYuan(r.doubleInterest)}\n`;
+            content += `利息合计：${formatAmountYuan(r.totalInterest)}\n`;
+            content += `执行标的总额：${formatAmountYuan(r.grandTotal)}\n`;
+            content += `大写：${digitUppercase(r.grandTotal)}\n\n`;
+            content += `================================\n`;
+            content += `计算人：_________    复核人：_________\n`;
+            content += `日期：${new Date().toLocaleDateString('zh-CN')}\n`;
+            content += `注：本计算结果仅供参考，最终以法院执行局核算为准。\n`;
+            
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `迟延履行利息计算书_${r.caseNumber || '执行案'}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
